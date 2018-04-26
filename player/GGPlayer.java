@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -85,7 +86,7 @@ public abstract class GGPlayer extends StateMachineGamer {
 	 * Returns a (possibly empty) list of all players in the game that are not the given role.
 	 */
 	public List<Role> findOpponents(Role r, StateMachine m) {
-		List<Role> roles = m.getRoles();
+		List<Role> roles = new ArrayList<Role>(m.getRoles());
 		roles.remove(r);
 		return roles;
 	}
@@ -97,7 +98,7 @@ public abstract class GGPlayer extends StateMachineGamer {
 	Random gen = null;
 	public int depthCharge(Role r, MachineState s, StateMachine m)
 			throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
-		if (gen != null) gen = new Random();
+		if (gen == null) gen = new Random();
 		MachineState current = s;
 		while (!m.findTerminalp(current)) {
 			List<List<Move>> moves = m.getLegalJointMoves(current);
