@@ -1,6 +1,5 @@
 package org.ggp.base.player.gamer.statemachine.random;
 
-import java.util.HashMap;
 import java.util.List;
 
 import org.ggp.base.apps.player.detail.DetailPanel;
@@ -26,117 +25,88 @@ public final class AlphaBetaGamer extends StateMachineGamer
 {
 	protected static final int timeoutThreshold = 2000;
 
-	private HashMap<MachineState, Integer> scoreCache;
+	Integer roleIndex = 0;
+
 	public AlphaBetaGamer() {
 		super();
-		scoreCache = new HashMap<MachineState, Integer>();
 	}
 
 	@Override
 	public String getName() {
-		return "AlphaBetaGamer";
+		return "MinMaxPlayer";
 	}
 
 	@Override
-	public Move stateMachineSelectMove(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException
-	{
+	public Move stateMachineSelectMove(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException	{
 		long start = System.currentTimeMillis();
 
-		long finishBy = timeout - 2000;
-
-		StateMachine theMachine = getStateMachine();
-		List<Move> myMoves = theMachine.getLegalMoves(getCurrentState(), getRole());
-
-		Move bestMove = myMoves.get(0);
-		List<Move> jointMoves = theMachine.getLegalJointMoves(getCurrentState(), getRole(), bestMove).get(0);
-		int bestMaxValue = getStateValue(theMachine.getNextState(getCurrentState(), jointMoves), finishBy, Integer.MIN_VALUE, Integer.MAX_VALUE);
-		for (int i = 1; i < myMoves.size(); i++) {
-			Move move = myMoves.get(i);
-			jointMoves = theMachine.getLegalJointMoves(getCurrentState(), getRole(), move).get(0);
-			int maxValue = getStateValue(theMachine.getNextState(getCurrentState(), jointMoves), finishBy, Integer.MIN_VALUE, Integer.MAX_VALUE);
-			if (maxValue > bestMaxValue) {
-				bestMove = move;
-				bestMaxValue = maxValue;
+		List<Move> moves = getStateMachine().getLegalMoves(getCurrentState(), getRole());
+		Move bestmove = moves.get(0);
+		int score = 0;
+		for (int i = 0; i < moves.size(); i++) {
+			Move move = moves.get(i);
+			int result = minscore(move, getCurrentState(), 0, 100, timeout);
+			if(result==-1) return bestmove;
+			if (result > score)		{
+				score = result;
+				bestmove = move;
 			}
-			if (timedOut(finishBy)) return bestMove;
 		}
-		System.out.println(SystemCalls.getFreeMemoryRatio());
 
 		long stop = System.currentTimeMillis();
 
-		notifyObservers(new GamerSelectedMoveEvent(myMoves, bestMove, stop - start));
-		return bestMove;
+		notifyObservers(new GamerSelectedMoveEvent(moves, bestmove, stop - start));
+		return bestmove;
 	}
 
-	public void dumpScoreCache() {
-		for (MachineState s: scoreCache.keySet()) {
-			System.out.println(s.toString() + ": " + scoreCache.get(s));
-		}
-	}
-
-	public boolean timedOut(long finishBy) {
-		return System.currentTimeMillis() > finishBy;
-	}
-
-	public int getStateValue(MachineState state, long finishBy, int alpha, int beta) {
-		if (timedOut(finishBy)) return -1;
-		Integer cachedScore = scoreCache.get(state);
-		if (cachedScore != null)
-			return cachedScore;
-
-		try {
-			StateMachine theMachine = getStateMachine();
-			if (theMachine.isTerminal(state)) {
-				scoreCache.put(state, theMachine.getGoal(state, getRole()));
-				return theMachine.getGoal(state, getRole());
-			}
-			List<List<Move>> moves = theMachine.getLegalJointMoves(state);
-			// Detect if it's our turn or opponent's
-			List<Move> myMoves = theMachine.getLegalMoves(state, getRole());
-			int minScore = Integer.MAX_VALUE;
-			int maxScore = Integer.MIN_VALUE;
-			for (int i = 0; i < moves.size(); i++) {
-				if (timedOut(finishBy)) return -1;
-				MachineState next = theMachine.getNextState(state, moves.get(i));
-				// Get cached score if possible
-				int score = getStateValue(next, finishBy, alpha, beta);
-				// If error or out of time, exit early
-				if (score == -1) {
-					return -1;
-				}
-				if (score < minScore) minScore = score;
-				if (score > maxScore) maxScore = score;
-				//如果是在自己的回合，那一定是计算alpha
-				if (myMoves.size() > 1) {
-					if (maxScore > alpha) {
-						alpha = maxScore;
-						if (alpha >= beta) {
-							scoreCache.put(state, alpha);
-							return alpha;
-						}
-					}
-				} else {
-					if (minScore < beta) {
-						beta = minScore;
-						if (beta <= alpha) {
-							scoreCache.put(state, beta);
-							return beta;
-						}
-					}
-				}
-			}
-			// If this is our move or an opponent's
-			if (myMoves.size() == 1) {
-				scoreCache.put(state, minScore);
-				return minScore;
-			} else {
-				scoreCache.put(state, maxScore);
-				return maxScore;
-			}
-
-		} catch (Exception e) {
+	private int minscore(Move move, MachineState state, int alpha, int beta, long timeout) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
+		if(System.currentTimeMillis() > timeout) {
 			return -1;
 		}
+
+		List<List<Move>> moves = getStateMachine().getLegalJointMoves(state, getRole(), move);
+		int score = 100;
+
+		for(List<Move> mov : moves) {
+			MachineState newstate = getStateMachine().getNextState(state, mov);
+
+			int result = maxscore(newstate, alpha, beta, timeout);
+			if(result==-1)
+				return -1;
+			beta = min(beta, result);
+			if (beta <= alpha)
+				return alpha;
+		}
+		return beta;
+	}
+
+	private int maxscore(MachineState state, int alpha, int beta, long timeout) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
+		if(System.currentTimeMillis() > timeout) {
+			return -1;
+		}
+
+		if (getStateMachine().isTerminal(state))
+			return getStateMachine().getGoal(state, getRole());
+		List<Move> my_moves = getStateMachine().getLegalMoves(state, getRole());
+		for (int i = 0; i < my_moves.size(); i++) {
+			int result = minscore(my_moves.get(i), state, alpha, beta, timeout);
+			if(result==-1)
+				return -1;
+			alpha = max(alpha, result);
+			if (alpha >= beta)
+				return beta;
+		}
+		return alpha;
+	}
+
+
+	private int min(int x, int y) {
+		if (x < y) return x;
+		return y;
+	}
+	private int max(int x, int y) {
+		if (x > y) return x;
+		return y;
 	}
 	@Override
 	public StateMachine getInitialStateMachine() {
