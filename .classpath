@@ -23,12 +23,5 @@
 	<classpathentry kind="lib" path="lib/javassist/javassist.jar"/>
 	<classpathentry kind="lib" path="lib/reflections/reflections-0.9.9-RC1.jar"/>
 	<classpathentry kind="lib" path="lib/Htmlparser/htmlparser-1.4.jar"/>
-	<classpathentry exported="true" kind="lib" path="/Users/chenweizuo/Desktop/ggp-base/commons-math3-3.6.1"/>
-	<classpathentry exported="true" kind="lib" path="/Users/chenweizuo/Desktop/ggp-base/commons-math3-3.6.1/commons-math3-3.6.1-javadoc.jar"/>
-	<classpathentry exported="true" kind="lib" path="/Users/chenweizuo/Desktop/ggp-base/commons-math3-3.6.1/commons-math3-3.6.1-sources.jar"/>
-	<classpathentry exported="true" kind="lib" path="/Users/chenweizuo/Desktop/ggp-base/commons-math3-3.6.1/commons-math3-3.6.1-test-sources.jar"/>
-	<classpathentry exported="true" kind="lib" path="/Users/chenweizuo/Desktop/ggp-base/commons-math3-3.6.1/commons-math3-3.6.1-tests.jar"/>
-	<classpathentry exported="true" kind="lib" path="/Users/chenweizuo/Desktop/ggp-base/commons-math3-3.6.1/commons-math3-3.6.1-tools.jar"/>
-	<classpathentry exported="true" kind="lib" path="/Users/chenweizuo/Desktop/ggp-base/commons-math3-3.6.1/commons-math3-3.6.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
