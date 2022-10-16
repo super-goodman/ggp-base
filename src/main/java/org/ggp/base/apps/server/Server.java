@@ -111,7 +111,7 @@ public final class Server extends JPanel implements ActionListener
 
 		runButton = new JButton(runButtonMethod());
 		startClockSpinner = new JSpinner(new SpinnerNumberModel(30,5,600,1));
-		playClockSpinner = new JSpinner(new SpinnerNumberModel(15,5,300,1));
+		playClockSpinner = new JSpinner(new SpinnerNumberModel(15,5,10000,1));
 		repetitionsSpinner = new JSpinner(new SpinnerNumberModel(1,1,1000,1));
 		matchesTabbedPane = new JTabbedPane();
 
@@ -123,7 +123,7 @@ public final class Server extends JPanel implements ActionListener
 		playerFields = new ArrayList<JComboBox<String>>();
 		theGame = null;
 
-		shouldScramble = new JCheckBox("Scramble GDL?", true);
+		shouldScramble = new JCheckBox("Scramble GDL?", false);
 		shouldQueue = new JCheckBox("Queue match?", true);
 		shouldDetail = new JCheckBox("Show match details?", true);
 		shouldSave = new JCheckBox("Save match to disk?", false);

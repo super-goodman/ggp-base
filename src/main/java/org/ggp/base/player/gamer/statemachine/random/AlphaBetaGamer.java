@@ -33,7 +33,7 @@ public final class AlphaBetaGamer extends StateMachineGamer
 
 	@Override
 	public String getName() {
-		return "MinMaxPlayer";
+		return "AlphaBetaGamer";
 	}
 
 	@Override
@@ -41,22 +41,22 @@ public final class AlphaBetaGamer extends StateMachineGamer
 		long start = System.currentTimeMillis();
 
 		List<Move> moves = getStateMachine().getLegalMoves(getCurrentState(), getRole());
-		Move bestmove = moves.get(0);
+		Move bestMove = moves.get(0);
 		int score = 0;
 		for (int i = 0; i < moves.size(); i++) {
 			Move move = moves.get(i);
 			int result = minscore(move, getCurrentState(), 0, 100, timeout);
-			if(result==-1) return bestmove;
+			if(result == -1) return bestMove;
 			if (result > score)		{
 				score = result;
-				bestmove = move;
+				bestMove = move;
 			}
 		}
 
 		long stop = System.currentTimeMillis();
 
-		notifyObservers(new GamerSelectedMoveEvent(moves, bestmove, stop - start));
-		return bestmove;
+		notifyObservers(new GamerSelectedMoveEvent(moves, bestMove, stop - start));
+		return bestMove;
 	}
 
 	private int minscore(Move move, MachineState state, int alpha, int beta, long timeout) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
@@ -65,8 +65,6 @@ public final class AlphaBetaGamer extends StateMachineGamer
 		}
 
 		List<List<Move>> moves = getStateMachine().getLegalJointMoves(state, getRole(), move);
-		int score = 100;
-
 		for(List<Move> mov : moves) {
 			MachineState newstate = getStateMachine().getNextState(state, mov);
 
@@ -87,9 +85,9 @@ public final class AlphaBetaGamer extends StateMachineGamer
 
 		if (getStateMachine().isTerminal(state))
 			return getStateMachine().getGoal(state, getRole());
-		List<Move> my_moves = getStateMachine().getLegalMoves(state, getRole());
-		for (int i = 0; i < my_moves.size(); i++) {
-			int result = minscore(my_moves.get(i), state, alpha, beta, timeout);
+		List<Move> moves = getStateMachine().getLegalMoves(state, getRole());
+		for (int i = 0; i < moves.size(); i++) {
+			int result = minscore(moves.get(i), state, alpha, beta, timeout);
 			if(result==-1)
 				return -1;
 			alpha = max(alpha, result);

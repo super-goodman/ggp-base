@@ -41,24 +41,30 @@ public final class MinMaxGamer extends StateMachineGamer
 	{
 		long start = System.currentTimeMillis();
 		List<Move> moves = getStateMachine().getLegalMoves(getCurrentState(), getRole());
-		Move bestmove = moves.get(0);
+		Move bestMove = bestMove(moves,timeout);
+		long stop = System.currentTimeMillis();
+		notifyObservers(new GamerSelectedMoveEvent(moves, bestMove, stop - start));
+		return bestMove;
+	}
+
+
+	public Move bestMove(List<Move> moves, long timeout) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException
+	{
 		int score = 0;
+		Move bestMove = moves.get(0);
 		for (int i = 0; i < moves.size(); i++) {
 			Move move = moves.get(i);
 			int result = minscore(move, getCurrentState(), timeout);
 			if (result > score)	{
 				score = result;
-				bestmove = move;
+				bestMove = move;
 			}
 			if(result==-1){
-				return bestmove;
+				return bestMove;
 			}
 		}
-		long stop = System.currentTimeMillis();
-		notifyObservers(new GamerSelectedMoveEvent(moves, bestmove, stop - start));
-		return bestmove;
+		return bestMove;
 	}
-
 	private int minscore(Move move, MachineState state, long timeout) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
 		// TODO:
         // 1) find a state after the move
@@ -66,7 +72,7 @@ public final class MinMaxGamer extends StateMachineGamer
         // 3) check all the possible moves
         // 4) find a move that gives as the minimum reward in the end
         // 5) return the best reward we can achieve from the resulting state
-		if(System.currentTimeMillis()>timeout) {
+		if(System.currentTimeMillis() > timeout) {
 			return -1;
 		}
 		List<List<Move>> moves = getStateMachine().getLegalJointMoves(state, getRole(), move);
@@ -90,7 +96,7 @@ public final class MinMaxGamer extends StateMachineGamer
         // 3) check all the possible moves
         // 4) find a move that gives as the highest reward in the end
         // 5) return the best reward we can achieve from the resulting state
-		if(System.currentTimeMillis()>timeout) {
+		if(System.currentTimeMillis() > timeout) {
 			return -1;
 		}
 

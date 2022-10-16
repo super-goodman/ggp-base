@@ -8,6 +8,7 @@ import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 
+
 /**
  * SampleLegalGamer is a minimal gamer which always plays the first
  * legal move it identifies, regardless of the state of the game.
@@ -25,6 +26,7 @@ public final class SampleLegalGamer extends SampleGamer
 	 * before the timeout.
 	 *
 	 */
+
 	@Override
 	public Move stateMachineSelectMove(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException
 	{
