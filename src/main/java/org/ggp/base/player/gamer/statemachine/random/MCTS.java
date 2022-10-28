@@ -1,124 +1,204 @@
 package org.ggp.base.player.gamer.statemachine.random;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import org.ggp.base.apps.player.detail.DetailPanel;
-import org.ggp.base.apps.player.detail.SimpleDetailPanel;
 import org.ggp.base.player.gamer.event.GamerSelectedMoveEvent;
-import org.ggp.base.player.gamer.exception.GamePreviewException;
-import org.ggp.base.player.gamer.statemachine.StateMachineGamer;
-import org.ggp.base.util.game.Game;
+import org.ggp.base.player.gamer.statemachine.sample.SampleGamer;
 import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
+import org.ggp.base.util.statemachine.Role;
 import org.ggp.base.util.statemachine.StateMachine;
-import org.ggp.base.util.statemachine.cache.CachedStateMachine;
 import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
-import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;
 
 
-public final class MCTS extends StateMachineGamer
+public final class MCTS extends SampleGamer
 {
-	protected static final int timeoutThreshold = 2000;
-	int[] howDeep = new int[1];
+	private int[] depth = new int[1];
+	private Map<MachineState, Integer> attemptsOnNode;
+	private Map<MachineState, Integer> nodeValue;
+	//exploration constant
+	private static final double Exploration = 4;
+	private static final int MctsTimeOut = 2500;
+	private static final int MctsTimeOutShort = 500;
+
+
 	@Override
 	public String getName() {
 		return "MCTS";
 	}
 
+
 	@Override
 	public Move stateMachineSelectMove(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException
 	{
+	    StateMachine theMachine = getStateMachine();
 		long start = System.currentTimeMillis();
 		long stop = System.currentTimeMillis();
-		long allowedSearchTime = timeout - 500;
 
-		StateMachine theMachine = getStateMachine();
 		List<Move> moves = theMachine.getLegalMoves(getCurrentState(), getRole());
-		int branchQuantity = moves.size();
-		Move selection = moves.get(0);
-
-		if (branchQuantity > 1) {
-			int[] branchScore = new int[branchQuantity];
-			int[] branchAttempts = new int[branchQuantity];
-			int currentBranch = 0;
-			int simulationCount = 0;
-
-			while (true) {
-				if (currentBranch == branchQuantity)
-					currentBranch = 0;
-				int randomExploitResult = getDepthCharge(getCurrentState(), moves.get(currentBranch));
-				branchScore[currentBranch] += randomExploitResult;
-				branchAttempts[currentBranch] += 1;
-				simulationCount += 1;
-				if (System.currentTimeMillis() > allowedSearchTime)
-    		        break;
-				currentBranch += 1;
-			}
-
-			double moveValue[] = new double[branchQuantity];
-
-			for (int i = 0; i < branchQuantity; i++) {
-			    moveValue[i] = (double)branchScore[i] / branchAttempts[i] + 1.414 * Math.sqrt(Math.log(simulationCount)/branchAttempts[i]);
-			}
-
-			int choosenMove = findHighestValueMove(moveValue, branchQuantity);
-			selection = moves.get(choosenMove);
-		}
+		Move selection = startGameTree(getRole(), getCurrentState(), timeout);
 
 		notifyObservers(new GamerSelectedMoveEvent(moves, selection, stop - start));
 		return selection;
 	}
 
-	public static int findHighestValueMove (double moveValue[], int numberOfBranches)
-	{
-		int choosenMove = 0;
-		double highestValue = moveValue[0];
-		for (int i = 1; i < numberOfBranches; i++)
-			if (moveValue[i] > highestValue) {
-				choosenMove = i;
-				highestValue = moveValue[i];
+
+
+	private Move startGameTree(Role role, MachineState currentState,long timeout) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
+		int score = 0;
+		StateMachine stateMachine = getStateMachine();
+		attemptsOnNode = new HashMap<MachineState, Integer>();
+		nodeValue = new HashMap<MachineState, Integer>();
+		attemptsOnNode.put(currentState, 0);
+		nodeValue.put(currentState, 0);
+
+		while(true) {
+
+			ArrayList<MachineState> path = new ArrayList<MachineState>();
+			//Selection
+			MachineState selectedState = select(currentState, role, path, timeout);
+
+			if (stateMachine.isTerminal(selectedState))  {
+				attemptsOnNode.put(selectedState, attemptsOnNode.get(selectedState) + 1);
+				nodeValue.put(selectedState, nodeValue.get(selectedState) + stateMachine.getGoal(selectedState, role));
+				continue;
 			}
-		return choosenMove;
+			//Expansion
+			expand(selectedState, role, timeout);
+			//Simulation
+			score += stateMachine.getGoal(stateMachine.performDepthCharge(selectedState, depth), role);
+			if (timeout - System.currentTimeMillis() <= MctsTimeOut){
+				break;
+			}
+			//Backpropagate
+			backpropagate(score, path, timeout);
+
+		}
+		List<Move> legalMoves = stateMachine.getLegalMoves(currentState, role);
+		double bestScore = 0;
+		Move bestMove  = legalMoves.get(0);
+		for (int i = 0; i < legalMoves.size(); i++) {
+			List<List<Move>> legalJointMoves = stateMachine.getLegalJointMoves(currentState, role, legalMoves.get(i));
+			for(int j = 0; j < legalJointMoves.size(); j++) {
+				MachineState subNode = stateMachine.getNextState(currentState, legalJointMoves.get(j));
+				if (attemptsOnNode.get(subNode) == 0) {
+					continue;
+				}
+				//Evaluation
+				double currentScore = nodeValue.get(subNode)/(double)attemptsOnNode.get(subNode);
+				if(currentScore > bestScore) {
+					bestScore = currentScore;
+					bestMove = legalMoves.get(i);
+				}
+				if (timeout - System.currentTimeMillis() <= MctsTimeOutShort){
+					return bestMove;
+				}
+			}
+		}
+		return bestMove;
 	}
 
 
+	private MachineState select(MachineState state, Role role, ArrayList<MachineState> path, long timeout) throws MoveDefinitionException, TransitionDefinitionException {
+		StateMachine stateMachine = getStateMachine();
+		MachineState result = state;
+		int score = 0;
+		while (true) {
+			path.add(state);
+			if ((timeout - System.currentTimeMillis() <= MctsTimeOut) || attemptsOnNode.get(state) == 0 ){
+				return state;
+			}
+			List<Move> legalMoves = stateMachine.getLegalMoves(state, role);
+			for (int i=0; i < legalMoves.size(); i++) {
+				List<List<Move>> legalJointMoves = stateMachine.getLegalJointMoves(state, role, legalMoves.get(i));
+				for(int j=0; j< legalJointMoves.size(); j++) {
+					MachineState subNode = stateMachine.getNextState(state, legalJointMoves.get(j));
+					if(attemptsOnNode.get(subNode) != null && attemptsOnNode.get(subNode) == 0) {
+						path.add(subNode);
+						return subNode;
+					}
+				}
+			}
 
-	int getDepthCharge(MachineState currentState, Move move) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
-	    StateMachine stateMachine = getStateMachine();
-        MachineState endBranch = stateMachine.performDepthCharge(stateMachine.getRandomNextState(currentState, getRole(), move), howDeep);
-        return stateMachine.getGoal(endBranch, getRole());
+			for (int i=0; i < legalMoves.size(); i++) {
+				List<List<Move>> legalJointMoves = stateMachine.getLegalJointMoves(state, role, legalMoves.get(i));
+				for(int j=0; j< legalJointMoves.size(); j++) {
+					MachineState subNode = getStateMachine().getNextState(state, legalJointMoves.get(j));
+					if(attemptsOnNode.get(subNode) == null) {
+						continue;
+					}
+					int currentScore = decideNodeToSimulate(state, subNode);
+					if (currentScore> score) {
+						result = subNode;
+						score = currentScore;
+					}
+				}
+			}
+			state = result;
+		}
+	}
+
+
+	private int decideNodeToSimulate(MachineState parentNode, MachineState subNode) {
+		double utility = nodeValue.get(subNode)/ (double)attemptsOnNode.get(subNode);
+		//UCT with ASM
+		return (int) (utility + Exploration*Math.sqrt(Math.log(attemptsOnNode.get(parentNode))/attemptsOnNode.get(subNode))) ;
+	}
+
+	private void expand(MachineState state, Role role, long timeout) throws MoveDefinitionException, TransitionDefinitionException {
+		StateMachine stateMachine = getStateMachine();
+		List<Move> legalMoves = stateMachine.getLegalMoves(state, role);
+		for (int i=0; i < legalMoves.size(); i++) {
+			List<List<Move>> legalJointMoves = stateMachine.getLegalJointMoves(state, role, legalMoves.get(i));
+			for(int j=0; j< legalJointMoves.size(); j++) {
+				MachineState subNode = stateMachine.getNextState(state, legalJointMoves.get(j));
+				if(attemptsOnNode.get(subNode) == null) {
+					attemptsOnNode.put(subNode, 0);
+					nodeValue.put(subNode, 0);
+				}
+				if (timeout - System.currentTimeMillis() <= MctsTimeOut){
+					return;
+				}
+			}
+		}
+	}
+
+
+	private void backpropagate(int score,
+			ArrayList<MachineState> path, long timeout) throws GoalDefinitionException {
+		for(int i=0; i< path.size(); i++) {
+			MachineState currentState = path.get(i);
+			attemptsOnNode.put(currentState, attemptsOnNode.get(currentState));
+			nodeValue.put(currentState, nodeValue.get(currentState) + score);
+			if (timeout - System.currentTimeMillis() <= MctsTimeOut){
+				return ;
+			}
+
+		}
 
 	}
-	@Override
-	public StateMachine getInitialStateMachine() {
-		return new CachedStateMachine(new ProverStateMachine());
-	}
 
-	@Override
-	public void preview(Game g, long timeout) throws GamePreviewException {
-		// Random gamer does no game previewing.
-	}
+
 
 	@Override
 	public void stateMachineMetaGame(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException
 	{
-		// Random gamer does no metagaming at the beginning of the match.
+
 	}
 
 	@Override
 	public void stateMachineStop() {
-		// Random gamer does no special cleanup when the match ends normally.
+
 	}
 
 	@Override
 	public void stateMachineAbort() {
-		// Random gamer does no special cleanup when the match ends abruptly.
+
 	}
 
-	@Override
-	public DetailPanel getDetailPanel() {
-		return new SimpleDetailPanel();
-	}
 }
